@@ -1,0 +1,9 @@
+{
+    "uuid": "chroma-cycle@rayanprasanna.github.com",
+    "name": "Chroma Cycle",
+    "description": "Changes desktop background daily with existing images",
+    "version": 1,
+    "shell-version": ["45", "46", "47"], 
+    "url": "https://github.com/rayanprasanna/chroma-cycle"
+}
+
