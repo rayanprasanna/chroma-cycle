@@ -16,7 +16,7 @@ ChromaCycle brings life to your desktop by automatically changing your backgroun
     Download the Extension:
     Clone or download this repository:
 
-git clone https://github.com/yourname/chromacycle.git
+git clone https://github.com/yourname/chromacycle.git](https://github.com/rayanprasanna/chroma-cycle.git
 
 Move to Extensions Folder:
 Copy the files to your GNOME extensions directory:
