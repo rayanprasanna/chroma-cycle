@@ -70,7 +70,7 @@ Want to contribute or tweak ChromaCycle? Here’s how you can get started:
 If you love ChromaCycle, consider starring this repository ⭐ or sharing it with others!
 📜 License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the GNU General Public License v3.0. See the LICENSE file for details.
 🌍 Connect With Us
 
     Author: Delath Rayan Prasanna De Zoysa
