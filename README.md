@@ -16,13 +16,13 @@ ChromaCycle brings life to your desktop by automatically changing your backgroun
     Download the Extension:
     Clone or download this repository:
 
-git clone https://github.com/yourname/chromacycle.git](https://github.com/rayanprasanna/chroma-cycle.git
+git clone https://github.com/rayanprasanna/chroma-cycle.git
 
 Move to Extensions Folder:
 Copy the files to your GNOME extensions directory:
 
-mkdir -p ~/.local/share/gnome-shell/extensions/chromacycle@yourname
-cp -r chromacycle/* ~/.local/share/gnome-shell/extensions/chromacycle@yourname
+mkdir -p ~/.local/share/gnome-shell/extensions/chroma-cycle@rayanprasanna.github.com
+cp -r chroma-cycle/* ~/.local/share/gnome-shell/extensions/chroma-cycle@rayanprasanna.github.com
 
 Enable the Extension:
 Activate ChromaCycle using the gnome-extensions tool:
@@ -50,7 +50,7 @@ Want to contribute or tweak ChromaCycle? Here’s how you can get started:
     Make changes to extension.js to customize behavior.
     Test your changes:
 
-    gnome-extensions enable chromacycle@yourname
+    gnome-extensions enable chroma-cycle@rayanprasanna.github.com
     gnome-shell --replace
 
     Submit a pull request with your enhancements!
