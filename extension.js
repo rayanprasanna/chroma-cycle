@@ -17,59 +17,56 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-const { GLib, Gio, St } = imports.gi;
+const { Gio, GLib, St } = imports.gi;
 const Main = imports.ui.main;
 
-let timer = null;
-const BACKGROUND_PATH = "/usr/share/backgrounds"; // Path to existing images
-const CHANGE_INTERVAL = 24 * 60 * 60 * 1000; // Change every 24 hours
-
-function listBackgroundImages() {
-    const dir = Gio.File.new_for_path(BACKGROUND_PATH);
-    if (!dir.query_exists(null)) return [];
-
-    const enumerator = dir.enumerate_children(
-        "standard::name",
-        Gio.FileQueryInfoFlags.NONE,
-        null
-    );
-
-    let files = [];
-    let info;
-    while ((info = enumerator.next_file(null))) {
-        const fileName = info.get_name();
-        if (fileName.match(/\.(jpg|jpeg|png)$/)) {
-            files.push(GLib.build_filenamev([BACKGROUND_PATH, fileName]));
-        }
-    }
-    return files;
-}
+let backgroundChangerTimeout;
+const ONE_DAY = 24 * 60 * 60 * 1000; // One day in milliseconds
+const IMAGE_FOLDER = GLib.get_home_dir() + '/Pictures/Wallpapers'; // Path to your wallpaper folder
 
 function setRandomBackground() {
-    const images = listBackgroundImages();
+    const dir = Gio.File.new_for_path(IMAGE_FOLDER);
+    const enumerator = dir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+
+    let images = [];
+    let fileInfo;
+
+    while ((fileInfo = enumerator.next_file(null)) !== null) {
+        const fileName = fileInfo.get_name();
+        if (fileName.endsWith('.jpg') || fileName.endsWith('.png')) {
+            images.push(IMAGE_FOLDER + '/' + fileName);
+        }
+    }
+
     if (images.length === 0) {
-        log("No background images found!");
+        log('No images found in the wallpaper folder.');
         return;
     }
 
     const randomImage = images[Math.floor(Math.random() * images.length)];
-    const settings = new Gio.Settings({ schema: "org.gnome.desktop.background" });
-    settings.set_string("picture-uri", `file://${randomImage}`);
-    log(`Background changed to: ${randomImage}`);
+    const settings = new Gio.Settings({ schema: 'org.gnome.desktop.background' });
+    settings.set_string('picture-uri', 'file://' + randomImage);
+
+    log('Background changed to: ' + randomImage);
+}
+
+function init() {
+    log('Background Changer extension initialized.');
 }
 
 function enable() {
+    log('Background Changer extension enabled.');
     setRandomBackground();
-    timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, CHANGE_INTERVAL, () => {
+    backgroundChangerTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ONE_DAY, () => {
         setRandomBackground();
         return GLib.SOURCE_CONTINUE;
     });
 }
 
 function disable() {
-    if (timer) {
-        GLib.Source.remove(timer);
-        timer = null;
+    log('Background Changer extension disabled.');
+    if (backgroundChangerTimeout) {
+        GLib.Source.remove(backgroundChangerTimeout);
+        backgroundChangerTimeout = null;
     }
 }
-
