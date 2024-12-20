@@ -17,56 +17,171 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-const { Gio, GLib, St } = imports.gi;
+'use strict';
+
+// Version-specific imports
+const GNOME_VERSION = parseInt(imports.misc.config.PACKAGE_VERSION.split('.')[0]);
+
+// Import GLib, Gio, and GObject based on GNOME version
+let GLib, Gio, GObject, St;
+if (GNOME_VERSION >= 45) {
+    GLib = imports('gi://GLib');
+    Gio = imports('gi://Gio');
+    GObject = imports('gi://GObject');
+    St = imports('gi://St');
+} else {
+    GLib = imports.gi.GLib;
+    Gio = imports.gi.Gio;
+    GObject = imports.gi.GObject;
+    St = imports.gi.St;
+}
+
 const Main = imports.ui.main;
+const PanelMenu = imports.ui.panelMenu;
+const PopupMenu = imports.ui.popupMenu;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
 
-let backgroundChangerTimeout;
-const ONE_DAY = 24 * 60 * 60 * 1000; // One day in milliseconds
-const IMAGE_FOLDER = GLib.get_home_dir() + '/Pictures/Wallpapers'; // Path to your wallpaper folder
+const WALLPAPER_SCHEMA = 'org.gnome.desktop.background';
+const WALLPAPER_KEY = 'picture-uri';
+const WALLPAPER_DARK_KEY = 'picture-uri-dark';
+const DEFAULT_DIRECTORY = GLib.get_home_dir() + '/Pictures/Wallpapers';
 
-function setRandomBackground() {
-    const dir = Gio.File.new_for_path(IMAGE_FOLDER);
-    const enumerator = dir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+const DailyScapeIndicator = GObject.registerClass(
+class DailyScapeIndicator extends PanelMenu.Button {
+    _init() {
+        super._init(0.0, 'DailyScape Background Changer');
 
-    let images = [];
-    let fileInfo;
+        // Create the menu
+        this._createMenu();
+        
+        // Initialize settings
+        this._settings = new Gio.Settings({ schema: WALLPAPER_SCHEMA });
+        
+        // Set up timer for daily changes
+        this._setupTimer();
+        
+        // Change wallpaper on startup
+        this._changeWallpaper();
+    }
 
-    while ((fileInfo = enumerator.next_file(null)) !== null) {
-        const fileName = fileInfo.get_name();
-        if (fileName.endsWith('.jpg') || fileName.endsWith('.png')) {
-            images.push(IMAGE_FOLDER + '/' + fileName);
+    _createMenu() {
+        // Add icon
+        let icon = new St.Icon({
+            icon_name: 'preferences-desktop-wallpaper-symbolic',
+            style_class: 'system-status-icon'
+        });
+        this.add_child(icon);
+
+        // Add "Change Now" button
+        let changeNowItem = new PopupMenu.PopupMenuItem('Change Wallpaper Now');
+        changeNowItem.connect('activate', () => {
+            this._changeWallpaper();
+        });
+        this.menu.addMenuItem(changeNowItem);
+
+        // Add separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // Add "Open Wallpaper Folder" button
+        let openFolderItem = new PopupMenu.PopupMenuItem('Open Wallpaper Folder');
+        openFolderItem.connect('activate', () => {
+            this._openWallpaperFolder();
+        });
+        this.menu.addMenuItem(openFolderItem);
+    }
+
+    _setupTimer() {
+        // Check time until next day
+        let now = GLib.DateTime.new_now_local();
+        let tomorrow = GLib.DateTime.new_local(
+            now.get_year(),
+            now.get_month(),
+            now.get_day_of_month() + 1,
+            0, 0, 0
+        );
+        let timeUntilTomorrow = tomorrow.difference(now);
+
+        // Set up timer for next day
+        this._timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, timeUntilTomorrow/1000, () => {
+            this._changeWallpaper();
+            // Reset timer for next day (24 hours)
+            this._timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 24 * 60 * 60 * 1000, () => {
+                this._changeWallpaper();
+                return GLib.SOURCE_CONTINUE;
+            });
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _getWallpaperFiles() {
+        let directory = Gio.File.new_for_path(DEFAULT_DIRECTORY);
+        let imageExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+        let wallpapers = [];
+
+        try {
+            let enumerator = directory.enumerate_children('standard::*', Gio.FileQueryInfoFlags.NONE, null);
+            let info;
+            while ((info = enumerator.next_file(null))) {
+                let filename = info.get_name();
+                if (imageExtensions.some(ext => filename.toLowerCase().endsWith(ext))) {
+                    wallpapers.push(directory.get_child(filename).get_path());
+                }
+            }
+        } catch (e) {
+            log(`DailyScape: Error reading wallpaper directory: ${e}`);
+            Main.notifyError('DailyScape', 'Error reading wallpaper directory');
+        }
+
+        return wallpapers;
+    }
+
+    _changeWallpaper() {
+        let wallpapers = this._getWallpaperFiles();
+        if (wallpapers.length === 0) {
+            log('DailyScape: No wallpapers found');
+            return;
+        }
+
+        // Get random wallpaper
+        let index = Math.floor(Math.random() * wallpapers.length);
+        let wallpaperUri = GLib.filename_to_uri(wallpapers[index], null);
+
+        // Set both light and dark mode wallpapers
+        this._settings.set_string(WALLPAPER_KEY, wallpaperUri);
+        this._settings.set_string(WALLPAPER_DARK_KEY, wallpaperUri);
+    }
+
+    _openWallpaperFolder() {
+        let uri = GLib.filename_to_uri(DEFAULT_DIRECTORY, null);
+        try {
+            Gio.app_info_launch_default_for_uri(uri, null);
+        } catch (e) {
+            log(`DailyScape: Error opening wallpaper folder: ${e}`);
         }
     }
 
-    if (images.length === 0) {
-        log('No images found in the wallpaper folder.');
-        return;
+    destroy() {
+        if (this._timerId) {
+            GLib.source_remove(this._timerId);
+        }
+        super.destroy();
     }
+});
 
-    const randomImage = images[Math.floor(Math.random() * images.length)];
-    const settings = new Gio.Settings({ schema: 'org.gnome.desktop.background' });
-    settings.set_string('picture-uri', 'file://' + randomImage);
-
-    log('Background changed to: ' + randomImage);
-}
+let dailyScapeIndicator;
 
 function init() {
-    log('Background Changer extension initialized.');
+    return new DailyScapeIndicator();
 }
 
 function enable() {
-    log('Background Changer extension enabled.');
-    setRandomBackground();
-    backgroundChangerTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ONE_DAY, () => {
-        setRandomBackground();
-        return GLib.SOURCE_CONTINUE;
-    });
+    dailyScapeIndicator = new DailyScapeIndicator();
+    Main.panel.addToStatusArea('dailyscape', dailyScapeIndicator);
 }
 
 function disable() {
-    log('Background Changer extension disabled.');
-    if (backgroundChangerTimeout) {
-        GLib.Source.remove(backgroundChangerTimeout);
-        backgroundChangerTimeout = null;
+    if (dailyScapeIndicator) {
+        dailyScapeIndicator.destroy();
+        dailyScapeIndicator = null;
     }
 }
